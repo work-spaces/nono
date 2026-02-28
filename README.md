@@ -110,6 +110,12 @@ nono run --network-profile claude-code --proxy-credential openai -- my-agent
 nono run --env-credential openai_api_key --allow-cwd -- my-agent
 ```
 
+### Agent SKILL Provenance and Supply Chain Security
+
+Instruction files (SKILLS.md, CLAUDE.md, AGENT.MD) and associated artifacts such as scripts are a supply chain attack vector. nono cryptographically signs and verifies them using Sigstore attestation with DSSE envelopes and in-toto / SLSA style statements. It supports keyed signing (system keystore) and keyless signing (OIDC via GitHub Actions + Fulcio + Rekor). Upon execution, nono verifies the signature, checks the signing certificate against trusted roots, and validates the statement predicates (e.g. signed within the last 30 days, signed by a trusted maintainer).
+
+Use the [nono-attest](https://github.com/marketplace/actions/nono-attest) GitHub Action for signing direct within GitGub workflows. Users are then able to attest the files originate from the expected repository and branch, and were signed by a trusted maintainer.
+
 ### Network Filtering
 
 Allowlist-based host filtering via a local proxy. The sandbox blocks all direct outbound connections — the agent can only reach explicitly allowed hosts. Cloud metadata endpoints and private network ranges are hardcoded as denied. DNS rebinding protection checks resolved IPs against the deny list before connecting.
@@ -168,16 +174,6 @@ Every session records command, timing, exit code, tracked paths, and cryptograph
 
 ```bash
 nono audit show 20260216-193311-20751 --json
-```
-
-### Instruction File Attestation
-
-Instruction files (SKILLS.md, CLAUDE.md, AGENT.MD) are a supply chain attack vector. nono cryptographically verifies them using Sigstore-based attestation with DSSE envelopes and in-toto statements. Supports keyed signing (system keystore) and keyless signing (OIDC via GitHub Actions + Fulcio + Rekor). On macOS, Seatbelt deny rules block unverified files at the kernel level. On Linux, seccomp-notify intercepts reads at runtime.
-
-```bash
-nono trust keygen --id my-signing-key
-nono trust sign SKILLS.md --key my-signing-key
-nono trust verify --all
 ```
 
 ## Quick Start
