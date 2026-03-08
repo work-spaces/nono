@@ -494,7 +494,7 @@
         "allow_file": ["$HOME/.claude.json", "$HOME/.claude.json.lock"],
         "read_file": ["$HOME/Library/Keychains/login.keychain-db", "$HOME/.gitconfig", "$HOME/.gitignore_global", "$HOME/.config/git/ignore"]
       },
-      "network": { "block": false, "network_profile": "developer" },
+      "network": { "block": false },
       "workdir": { "access": "readwrite" },
       "hooks": {
         "claude-code": {
@@ -529,7 +529,7 @@
           "$TMPDIR/openclaw-$UID"
         ]
       },
-      "network": { "block": false, "network_profile": "developer" },
+      "network": { "block": false },
       "workdir": { "access": "read" },
       "undo": {
         "exclude_patterns": ["node_modules", ".next"]
@@ -555,7 +555,7 @@
           "$HOME/.local/share/opencode"
         ]
       },
-      "network": { "block": false, "network_profile": "developer" },
+      "network": { "block": false },
       "workdir": { "access": "readwrite" },
       "undo": {
         "exclude_patterns": ["node_modules", ".next"]
