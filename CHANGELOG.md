@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.14.0] - 2026-03-08
+
+### Bug Fixes
+
+- Resolve symlinked paths in deny rule checks (#272) (#279) ([#279](https://github.com/always-further/nono/pull/279))
+
+
+### Features
+
+- Add environment variable equivalents for CLI flags (#270) (#278) ([#278](https://github.com/always-further/nono/pull/278))
+
 ## [0.12.0] - 2026-03-07
 
 ### Bug Fixes
