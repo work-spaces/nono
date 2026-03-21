@@ -240,6 +240,8 @@ pub enum Commands {
     #[command(after_help = "\x1b[1mEXAMPLES\x1b[0m
   nono trust sign SKILLS.md                    # Sign with default keystore key
   nono trust sign SKILLS.md --key my-key       # Sign with a specific key ID
+  nono trust sign-policy                       # Sign project trust policy
+  nono trust sign-policy --user                # Sign user-level trust policy
   nono trust verify SKILLS.md                  # Verify a file
   nono trust verify --all                      # Verify all files matching policy
   nono trust list                              # List files and verification status
@@ -1331,11 +1333,16 @@ pub struct TrustSignArgs {
 #[command(disable_help_flag = true)]
 pub struct TrustSignPolicyArgs {
     /// Trust policy file to sign (default: trust-policy.json in CWD)
+    #[arg(conflicts_with = "user")]
     pub file: Option<PathBuf>,
 
     /// Key ID to use from the system keystore (default: "default")
     #[arg(long, value_name = "KEY_ID")]
     pub key: Option<String>,
+
+    /// Sign the user-level trust policy at ~/.config/nono/trust-policy.json
+    #[arg(long)]
+    pub user: bool,
 
     /// Print help
     #[arg(long, short = 'h', action = clap::ArgAction::Help, help_heading = "OPTIONS")]

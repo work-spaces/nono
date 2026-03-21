@@ -579,6 +579,20 @@ fn run_sign_policy(args: TrustSignPolicyArgs) -> Result<()> {
     // Resolve the policy file path
     let policy_path = match args.file {
         Some(path) => path,
+        None if args.user => {
+            let user_path =
+                user_trust_policy_path().ok_or_else(|| nono::NonoError::TrustSigning {
+                    path: "~/.config/nono/trust-policy.json".to_string(),
+                    reason: "could not resolve user config directory".to_string(),
+                })?;
+            if !user_path.exists() {
+                return Err(nono::NonoError::TrustSigning {
+                    path: user_path.display().to_string(),
+                    reason: "user-level trust-policy.json not found. Run 'nono trust init --user' to create one.".to_string(),
+                });
+            }
+            user_path
+        }
         None => {
             let cwd = std::env::current_dir().map_err(nono::NonoError::Io)?;
             let default_path = cwd.join("trust-policy.json");

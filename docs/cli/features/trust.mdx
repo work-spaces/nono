@@ -137,6 +137,7 @@ Sign the trust policy file. Required after every modification to `trust-policy.j
 
 ```bash
 nono trust sign-policy                     # sign trust-policy.json in CWD
+nono trust sign-policy --user              # sign user-level trust policy (~/.config/nono/)
 nono trust sign-policy --key my-key        # specific key
 ```
 
@@ -469,7 +470,7 @@ The `includes` list is empty — the project-level policy declares which files t
 You can also add keyed publishers for local development keys, though in practice your own key is already trusted implicitly — the user-level policy is more useful for declaring trust in CI/CD identities and other team members.
 
 ```bash
-nono trust sign-policy ~/.config/nono/trust-policy.json
+nono trust sign-policy --user
 ```
 
 ## Pre-exec Scanning

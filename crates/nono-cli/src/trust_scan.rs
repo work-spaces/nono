@@ -108,9 +108,20 @@ pub fn verify_policy_signature(policy_path: &Path) -> Result<()> {
     let bundle_path = trust::bundle_path_for(policy_path);
 
     if !bundle_path.exists() {
+        let is_user_policy = crate::trust_cmd::user_trust_policy_path()
+            .map(|p| p == policy_path)
+            .unwrap_or(false);
+        let hint = if is_user_policy {
+            "Run 'nono trust sign-policy --user' to sign it.".to_string()
+        } else {
+            format!(
+                "Run 'nono trust sign-policy {}' to sign it.",
+                policy_path.display()
+            )
+        };
         return Err(nono::NonoError::TrustVerification {
             path: policy_path.display().to_string(),
-            reason: "trust policy is unsigned (no .bundle sidecar found)".to_string(),
+            reason: format!("trust policy is unsigned (no .bundle sidecar found). {hint}"),
         });
     }
 

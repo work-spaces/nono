@@ -921,9 +921,15 @@ Sign a trust policy file.
 
 ```bash
 nono trust sign-policy                     # Sign trust-policy.json in CWD
+nono trust sign-policy --user              # Sign user-level trust policy (~/.config/nono/)
 nono trust sign-policy path/to/policy.json # Sign specific file
 nono trust sign-policy --key my-key        # Use a specific key
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--user` | Sign the user-level trust policy at `~/.config/nono/trust-policy.json`. The user-level policy anchors trust — without it, project-level policies are not authoritative |
+| `--key <KEY_ID>` | Key ID from system keystore (default: "default") |
 
 ### `nono trust verify`
 
