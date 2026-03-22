@@ -3,11 +3,15 @@ title: Claude Code
 description: Sandboxing Anthropic Claude Code with nono
 ---
 
+<Note>
+When you run Claude Code under `nono`, prefer using `nono` as the only sandbox layer. Leave Claude Code's built-in sandbox disabled so all filesystem and network boundaries come from the kernel-enforced `nono` policy.
+
+If you keep Claude Code's sandbox enabled, Anthropic documents an intentional escape hatch: when a command fails because of sandbox restrictions, Claude may retry it with `dangerouslyDisableSandbox` after going through Claude Code's normal permissions flow. To disable that fallback, set `"allowUnsandboxedCommands": false` in Claude Code's sandbox settings. See Anthropic's [sandboxing docs](https://code.claude.com/docs/en/sandboxing).
+</Note>
+
 ## Why Sandbox Claude Code?
 
-Claude Code includes its own sandbox mechanism, but the agent is able to override the sandbox by calling `dangerouslyOverrideSandbox: true` and access any file and perform any operation on the system.
-
-![Claude Code using dangerouslyOverrideSandbox](/assets/claude-code-overrides-the-sandbox-without-permission.webp)
+Claude Code includes its own sandboxing, but Anthropic documents an intentional escape hatch: when a command fails because of sandbox restrictions, Claude may retry it with `dangerouslyDisableSandbox` after approval. Running Claude inside `nono` gives you a single kernel-enforced boundary that is easier to reason about and audit.
 
 ## Quick Start
 
