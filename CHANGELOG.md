@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.22.1] - 2026-03-23
+
+### Build
+
+- *(audit)* Add cargo-audit ignores for AWS-LC X.509 advisories (#449) ([#449](https://github.com/always-further/nono/pull/449))
+
+
+### CI/CD
+
+- Add change classification to skip unnecessary jobs (#456) ([#456](https://github.com/always-further/nono/pull/456))
+
+
+### Documentation
+
+- Detect system architecture in deb installation command (#455) ([#455](https://github.com/always-further/nono/pull/455))
+
+- Fix arrow direction in OS-level enforcement diagram (#453) ([#453](https://github.com/always-further/nono/pull/453))
+
+- *(clients)* Recommend disabling agent sandboxes when running under nono (#451) ([#451](https://github.com/always-further/nono/pull/451))
+
 ## [0.22.0] - 2026-03-21
 
 ### Dependencies
