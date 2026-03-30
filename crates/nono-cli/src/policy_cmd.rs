@@ -428,8 +428,10 @@ fn cmd_show(args: PolicyShowArgs) -> Result<()> {
     let raw_extends = profile::load_profile_extends(&args.profile);
     let profile = profile::load_profile(&args.profile)?;
 
-    if args.format.as_deref() == Some("manifest") {
-        let workdir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    if matches!(args.format, Some(crate::cli::PolicyShowFormat::Manifest)) {
+        let workdir = std::env::current_dir().map_err(|e| {
+            NonoError::ConfigParse(format!("cannot determine working directory: {e}"))
+        })?;
         let manifest = resolve_to_manifest(&profile, &workdir)?;
         let json = manifest.to_json()?;
         println!("{json}");
@@ -2057,12 +2059,19 @@ fn resolve_to_manifest(
         let endpoint_rules: Vec<manifest::EndpointRule> = cred
             .endpoint_rules
             .iter()
-            .filter_map(|r| {
-                let method = r.method.parse().ok()?;
-                let path = r.path.parse().ok()?;
-                Some(manifest::EndpointRule { method, path })
+            .map(|r| {
+                let method = r.method.parse().map_err(|e| {
+                    NonoError::ConfigParse(format!(
+                        "invalid endpoint rule method '{}': {e}",
+                        r.method
+                    ))
+                })?;
+                let path = r.path.parse().map_err(|e| {
+                    NonoError::ConfigParse(format!("invalid endpoint rule path '{}': {e}", r.path))
+                })?;
+                Ok(manifest::EndpointRule { method, path })
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         credentials.push(manifest::Credential {
             name: name

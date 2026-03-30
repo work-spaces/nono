@@ -41,6 +41,8 @@ impl TryFrom<&CapabilityManifest> for CapabilitySet {
         if let Some(ref net) = manifest.network {
             caps = match net.mode {
                 NetworkMode::Blocked => caps.block_network(),
+                // Proxy mode blocks direct network access at the OS level; the CLI
+                // layer sets up the reverse proxy separately and allows its port.
                 NetworkMode::Proxy => caps.set_network_mode(InternalNetworkMode::Blocked),
                 NetworkMode::Unrestricted => caps.set_network_mode(InternalNetworkMode::AllowAll),
             };
