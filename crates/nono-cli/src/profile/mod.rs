@@ -1167,6 +1167,14 @@ pub struct Profile {
     /// Treated like built-in heavy directories (for example `target`).
     #[serde(default)]
     pub skipdirs: Vec<String>,
+    /// Pack dependencies verified at launch before sandbox is applied.
+    /// Each entry is a `<namespace>/<name>` reference to an installed pack.
+    #[serde(default)]
+    pub packs: Vec<String>,
+    /// Extra arguments appended to the child command at launch.
+    /// Supports variable expansion (e.g. `$NONO_PACKAGES`).
+    #[serde(default)]
+    pub command_args: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -1208,6 +1216,10 @@ struct ProfileDeserialize {
     interactive: bool,
     #[serde(default)]
     skipdirs: Vec<String>,
+    #[serde(default)]
+    packs: Vec<String>,
+    #[serde(default)]
+    command_args: Vec<String>,
 }
 
 impl From<ProfileDeserialize> for Profile {
@@ -1230,6 +1242,8 @@ impl From<ProfileDeserialize> for Profile {
             allow_parent_of_protected: raw.allow_parent_of_protected,
             interactive: raw.interactive,
             skipdirs: raw.skipdirs,
+            packs: raw.packs,
+            command_args: raw.command_args,
         }
     }
 }
@@ -1262,6 +1276,7 @@ pub fn is_user_override(name: &str) -> bool {
 /// A package-managed profile appears in `~/.config/nono/profiles/` as a symlink
 /// into the package store. This helper resolves that relationship so package
 /// hooks and other assets can be located relative to the installed package.
+#[allow(dead_code)]
 pub fn get_package_for_profile(name: &str) -> Option<PathBuf> {
     if !is_valid_profile_name(name) {
         return None;
@@ -1686,6 +1701,8 @@ fn merge_profiles(base: Profile, child: Profile) -> Profile {
             .or(base.allow_parent_of_protected),
         interactive: base.interactive || child.interactive,
         skipdirs: dedup_append(&base.skipdirs, &child.skipdirs),
+        packs: dedup_append(&base.packs, &child.packs),
+        command_args: dedup_append(&base.command_args, &child.command_args),
     }
 }
 
@@ -1857,6 +1874,12 @@ pub fn expand_vars(path: &str, workdir: &Path) -> Result<PathBuf> {
     // Only expand $XDG_RUNTIME_DIR when set; leave literal otherwise
     if let Some(ref rt) = xdg_runtime {
         expanded = expanded.replace("$XDG_RUNTIME_DIR", rt);
+    }
+
+    // Expand $NONO_PACKAGES to the package store directory
+    if expanded.contains("$NONO_PACKAGES") {
+        let packages_dir = crate::package::package_store_dir()?;
+        expanded = expanded.replace("$NONO_PACKAGES", &packages_dir.to_string_lossy());
     }
 
     Ok(PathBuf::from(expanded))
@@ -3042,6 +3065,8 @@ mod tests {
             allow_parent_of_protected: None,
             interactive: false,
             skipdirs: vec!["vendor".to_string()],
+            packs: vec![],
+            command_args: vec![],
         }
     }
 
@@ -3113,6 +3138,8 @@ mod tests {
             allow_parent_of_protected: Some(true),
             interactive: false,
             skipdirs: vec!["dist".to_string()],
+            packs: vec![],
+            command_args: vec![],
         }
     }
 

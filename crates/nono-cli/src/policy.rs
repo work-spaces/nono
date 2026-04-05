@@ -126,6 +126,10 @@ pub struct ProfileDef {
     pub allow_gpu: Option<bool>,
     #[serde(default)]
     pub interactive: bool,
+    #[serde(default)]
+    pub packs: Vec<String>,
+    #[serde(default)]
+    pub command_args: Vec<String>,
 }
 
 impl ProfileDef {
@@ -160,6 +164,8 @@ impl ProfileDef {
             allow_parent_of_protected: None,
             interactive: self.interactive,
             skipdirs: Vec::new(),
+            packs: self.packs.clone(),
+            command_args: self.command_args.clone(),
         }
     }
 }
@@ -627,7 +633,7 @@ pub(crate) fn add_deny_access_rules(
         match resolve_parent_symlinks(&path) {
             Ok(resolved) => resolved,
             Err(e) => {
-                warn!(
+                debug!(
                     "Skipping parent-symlink resolution for {}: {}",
                     path.display(),
                     e

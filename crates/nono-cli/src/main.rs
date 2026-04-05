@@ -13,6 +13,7 @@ mod config;
 mod credential_runtime;
 mod exec_strategy;
 mod execution_runtime;
+#[allow(dead_code)]
 mod hooks;
 mod instruction_deny;
 mod launch_runtime;

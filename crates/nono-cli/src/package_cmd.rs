@@ -354,6 +354,7 @@ struct DownloadedArtifact {
     bytes: Vec<u8>,
     sha256_digest: String,
     signer_identity: SignerIdentity,
+    bundle_json: String,
 }
 
 struct InstallSummary {
@@ -434,6 +435,7 @@ fn download_and_verify_artifacts(
             bytes,
             sha256_digest: digest,
             signer_identity,
+            bundle_json,
         });
     }
 
@@ -550,6 +552,31 @@ fn write_supporting_artifacts(staging_root: &Path, downloads: &[DownloadedArtifa
             fs::write(&path, &artifact.bytes).map_err(NonoError::Io)?;
         }
     }
+
+    // Write per-artifact bundles into a single JSON array at the pack root
+    let bundles: Vec<serde_json::Value> = downloads
+        .iter()
+        .filter_map(|a| {
+            serde_json::from_str::<serde_json::Value>(&a.bundle_json)
+                .ok()
+                .map(|bundle| {
+                    serde_json::json!({
+                        "artifact": a.filename,
+                        "digest": a.sha256_digest,
+                        "bundle": bundle
+                    })
+                })
+        })
+        .collect();
+
+    if !bundles.is_empty() {
+        let bundle_path = staging_root.join(".nono-trust.bundle");
+        let json = serde_json::to_string_pretty(&bundles).map_err(|e| {
+            NonoError::PackageInstall(format!("failed to serialize trust bundle: {e}"))
+        })?;
+        fs::write(&bundle_path, json).map_err(NonoError::Io)?;
+    }
+
     Ok(())
 }
 
@@ -617,6 +644,14 @@ fn install_manifest_artifact(
                 .join(file_name(&artifact.path)?);
             write_bytes(&path, bytes)?;
             ensure_executable(&path)?;
+            path
+        }
+        ArtifactType::Plugin => {
+            let path = staging_root.join(&artifact.path);
+            write_bytes(&path, bytes)?;
+            if artifact.path.contains("/bin/") || artifact.path.ends_with(".sh") {
+                ensure_executable(&path)?;
+            }
             path
         }
     };
