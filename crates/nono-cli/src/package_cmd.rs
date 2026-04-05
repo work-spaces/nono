@@ -648,15 +648,9 @@ fn install_manifest_artifact(
             path
         }
         ArtifactType::Plugin => {
-            if artifact.path.contains("..") {
-                return Err(NonoError::PackageInstall(format!(
-                    "artifact path contains unsafe component: '{}'",
-                    artifact.path
-                )));
-            }
+            validate_relative_path(&artifact.path)?;
             let path = staging_root.join(&artifact.path);
             write_bytes(&path, bytes)?;
-            validate_path_within(staging_root, &path)?;
             if artifact.path.contains("/bin/") || artifact.path.ends_with(".sh") {
                 ensure_executable(&path)?;
             }
@@ -1040,15 +1034,27 @@ fn validate_safe_name(name: &str, field: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_path_within(base: &Path, full: &Path) -> Result<()> {
-    let canonical_base = base.canonicalize().map_err(NonoError::Io)?;
-    let canonical_full = full.canonicalize().map_err(NonoError::Io)?;
-    if !canonical_full.starts_with(&canonical_base) {
+fn validate_relative_path(path: &str) -> Result<()> {
+    let p = Path::new(path);
+    if p.is_absolute() {
         return Err(NonoError::PackageInstall(format!(
-            "path '{}' escapes the allowed directory '{}'",
-            full.display(),
-            base.display()
+            "artifact path must be relative, got '{path}'"
         )));
+    }
+    for component in p.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                return Err(NonoError::PackageInstall(format!(
+                    "artifact path contains '..': '{path}'"
+                )));
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err(NonoError::PackageInstall(format!(
+                    "artifact path must be relative, got '{path}'"
+                )));
+            }
+            _ => {}
+        }
     }
     Ok(())
 }
