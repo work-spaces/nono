@@ -36,12 +36,16 @@ has_kfd_device() {
     [[ -e /dev/kfd ]]
 }
 
+has_dxg_device() {
+    [[ -e /dev/dxg ]]
+}
+
 has_any_gpu() {
-    has_render_nodes || has_nvidia_devices || has_kfd_device
+    has_render_nodes || has_nvidia_devices || has_kfd_device || has_dxg_device
 }
 
 if ! has_any_gpu; then
-    skip_test "GPU access suite" "no GPU devices found (/dev/dri/renderD*, /dev/nvidia*, /dev/kfd)"
+    skip_test "GPU access suite" "no GPU devices found (/dev/dri/renderD*, /dev/nvidia*, /dev/kfd, /dev/dxg)"
     print_summary
     exit 0
 fi

@@ -50,7 +50,8 @@ fi
 has_any_gpu() {
     ls /dev/dri/renderD* >/dev/null 2>&1 || \
     ls /dev/nvidia0 >/dev/null 2>&1 || \
-    [[ -e /dev/kfd ]]
+    [[ -e /dev/kfd ]] || \
+    [[ -e /dev/dxg ]]
 }
 
 if ! has_any_gpu; then
@@ -104,7 +105,7 @@ echo "Configuration:"
 echo "  Model:        ${TEST_MODEL}"
 echo "  Port:         ${OLLAMA_PORT}"
 echo "  Model store:  ${OLLAMA_MODELS}"
-echo "  GPU devices:  $(ls /dev/dri/renderD* /dev/nvidia* /dev/kfd 2>/dev/null | tr '\n' ' ')"
+echo "  GPU devices:  $(ls /dev/dri/renderD* /dev/nvidia* /dev/kfd /dev/dxg 2>/dev/null | tr '\n' ' ')"
 echo ""
 
 # =============================================================================
