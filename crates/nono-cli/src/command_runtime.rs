@@ -3,8 +3,9 @@ use crate::exec_strategy;
 use crate::execution_runtime::execute_sandboxed;
 use crate::launch_runtime::{
     load_configured_detach_sequence, prepare_run_launch_plan, resolve_requested_workdir,
-    ExecutionFlags, LaunchPlan, SessionLaunchOptions,
+    select_exec_strategy, ExecutionFlags, LaunchPlan, SessionLaunchOptions,
 };
+use crate::proxy_runtime::prepare_proxy_launch_options;
 use crate::output;
 use crate::sandbox_prepare::{
     prepare_sandbox, print_allow_gpu_warning, print_allow_launch_services_warning,
@@ -83,16 +84,29 @@ pub(crate) fn run_shell(args: ShellArgs, silent: bool) -> Result<()> {
         eprintln!();
     }
 
+    let proxy = prepare_proxy_launch_options(&args.sandbox, &prepared, silent)?;
+    let strategy = select_exec_strategy(
+        false,
+        proxy.active,
+        prepared.capability_elevation,
+        false,
+        false,
+    );
+
     execute_sandboxed(LaunchPlan {
         program: shell_path.into_os_string(),
         cmd_args: vec![],
         caps: prepared.caps,
         loaded_secrets: prepared.secrets,
         flags: ExecutionFlags {
+            strategy,
             workdir: resolve_requested_workdir(args.sandbox.workdir.as_ref()),
             no_diagnostics: true,
             capability_elevation: prepared.capability_elevation,
+            #[cfg(target_os = "linux")]
+            wsl2_proxy_policy: prepared.wsl2_proxy_policy,
             override_deny_paths: prepared.override_deny_paths,
+            proxy,
             session: SessionLaunchOptions {
                 session_name: args.name,
                 detach_sequence: load_configured_detach_sequence()?,
