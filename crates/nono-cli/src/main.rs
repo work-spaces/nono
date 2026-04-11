@@ -97,6 +97,8 @@ mod tests {
     };
     use crate::proxy_runtime::{resolve_effective_proxy_settings, EffectiveProxySettings};
     use crate::sandbox_prepare::maybe_enable_macos_gpu;
+    #[cfg(target_os = "linux")]
+    use crate::sandbox_prepare::maybe_enable_gpu;
     #[cfg(target_os = "macos")]
     use crate::sandbox_prepare::maybe_enable_macos_launch_services;
     use crate::sandbox_prepare::PreparedSandbox;
@@ -506,5 +508,45 @@ mod tests {
             err.to_string().contains("only supported on macOS"),
             "error should mention macOS support"
         );
+    }
+
+    /// On Linux, maybe_enable_gpu should succeed if GPU devices exist, or return
+    /// a clear "no GPU devices found" error if not. It must NOT hard-fail just
+    /// because /dev/dri is absent — headless NVIDIA (CUDA-only) and AMD (ROCm-only)
+    /// machines may lack DRM render nodes entirely.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_maybe_enable_gpu_linux_does_not_require_dri() {
+        let mut caps = CapabilitySet::new();
+
+        let result = maybe_enable_gpu(&mut caps, true, true);
+
+        // On a GPU machine: Ok(true) with fs capabilities added.
+        // On a non-GPU CI machine: Err mentioning "no GPU devices found".
+        // Either outcome is correct. What must NOT happen is an error about
+        // /dev/dri specifically, which would break NVIDIA/ROCm-only setups.
+        match result {
+            Ok(enabled) => {
+                assert!(enabled, "should be active when devices are found");
+                assert!(
+                    caps.has_fs(),
+                    "should have granted fs capabilities for GPU devices"
+                );
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                assert!(
+                    msg.contains("no GPU devices found"),
+                    "error on non-GPU machine should be generic, not DRI-specific: {msg}"
+                );
+                // Verify the error lists all checked paths
+                assert!(
+                    msg.contains("renderD"),
+                    "error should mention renderD: {msg}"
+                );
+                assert!(msg.contains("nvidia"), "error should mention nvidia: {msg}");
+                assert!(msg.contains("kfd"), "error should mention kfd: {msg}");
+            }
+        }
     }
 }

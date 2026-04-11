@@ -324,18 +324,6 @@ pub(crate) fn maybe_enable_macos_gpu(
     Ok(false)
 }
 
-pub(crate) fn print_allow_gpu_warning(silent: bool) {
-    if silent {
-        return;
-    }
-
-    eprintln!(
-        "  {}",
-        "WARNING: --allow-gpu permits the sandboxed process to access the GPU.".yellow()
-    );
-    eprintln!("  GPU access may expose additional attack surface. Only use when your workload requires it.");
-}
-
 pub(crate) fn print_allow_launch_services_warning(silent: bool) {
     if silent {
         return;
@@ -357,6 +345,172 @@ fn missing_cwd_prompt_must_fail(
     detached_prompt_response: Option<DetachedCwdPromptResponse>,
 ) -> bool {
     silent || (detached_launch && detached_prompt_response.is_none())
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn maybe_enable_gpu(
+    caps: &mut CapabilitySet,
+    cli_requested: bool,
+    profile_allowed: bool,
+) -> Result<bool> {
+    if !cli_requested {
+        return Ok(false);
+    }
+
+    if !profile_allowed {
+        return Err(NonoError::ConfigParse(
+            "--allow-gpu: the active profile does not permit GPU access (set allow_gpu: true)"
+                .to_string(),
+        ));
+    }
+
+    // Track how many GPU device nodes we grant so we can fail if none are found.
+    let mut gpu_device_count: usize = 0;
+
+    // DRM render nodes (compute-only, no modesetting).
+    // Render nodes (/dev/dri/renderD*) are the safe minimum for GPU compute —
+    // they don't grant display control, only shader dispatch and buffer management.
+    // Optional: some headless CUDA/ROCm setups have no DRM render nodes.
+    if let Ok(dri_entries) = std::fs::read_dir("/dev/dri") {
+        let render_nodes: Vec<_> = dri_entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_str()
+                    .is_some_and(|n| n.starts_with("renderD"))
+            })
+            .map(|e| e.path())
+            .collect();
+
+        for node in &render_nodes {
+            let cap = FsCapability::new_file(node.clone(), AccessMode::ReadWrite)?;
+            caps.add_fs(cap);
+        }
+        gpu_device_count = gpu_device_count.saturating_add(render_nodes.len());
+    }
+
+    // NVIDIA proprietary driver devices (if present).
+    // We enumerate /dev/nvidia* to support multi-GPU systems (e.g. 8×A100).
+    // Only compute-relevant devices are included:
+    //   - nvidia[0-N]: per-GPU device nodes
+    //   - nvidiactl: control device (required for all CUDA operations)
+    //   - nvidia-uvm: Unified Virtual Memory (required for CUDA managed memory)
+    // Deliberately excluded:
+    //   - nvidia-modeset: display control, not compute (same rationale as /dev/dri/card*)
+    //
+    // Note: nvidia-uvm has been the target of privilege escalation CVEs
+    // (e.g. CVE-2024-0090). We grant it because CUDA doesn't work without it,
+    // but this is a higher-risk surface than DRM render nodes.
+    if let Ok(dev_entries) = std::fs::read_dir("/dev") {
+        let nvidia_devices: Vec<_> = dev_entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name().to_str().is_some_and(|n| {
+                    n == "nvidiactl"
+                        || n == "nvidia-uvm"
+                        || (n.starts_with("nvidia")
+                            && n[6..].bytes().all(|b| b.is_ascii_digit())
+                            && n.len() > 6)
+                })
+            })
+            .map(|e| e.path())
+            .collect();
+        gpu_device_count = gpu_device_count.saturating_add(nvidia_devices.len());
+        for dev in &nvidia_devices {
+            let cap = FsCapability::new_file(dev.clone(), AccessMode::ReadWrite)?;
+            caps.add_fs(cap);
+        }
+    }
+
+    // NVIDIA capability devices for MIG (Multi-Instance GPU) on A100/H100.
+    // These are required when MIG mode is enabled. Enumerate individual devices
+    // rather than granting the entire directory.
+    if let Ok(cap_entries) = std::fs::read_dir("/dev/nvidia-caps") {
+        for entry in cap_entries.filter_map(|e| e.ok()) {
+            let cap = FsCapability::new_file(entry.path(), AccessMode::ReadWrite)?;
+            caps.add_fs(cap);
+        }
+    }
+
+    // AMD KFD (Kernel Fusion Driver) for ROCm/HIP compute.
+    // /dev/kfd is a single shared device node used by all AMD GPUs on the system.
+    // The per-GPU isolation is handled via DRM render nodes (already granted above).
+    let kfd = std::path::Path::new("/dev/kfd");
+    if kfd.exists() {
+        let cap = FsCapability::new_file(kfd, AccessMode::ReadWrite)?;
+        caps.add_fs(cap);
+        gpu_device_count = gpu_device_count.saturating_add(1);
+    }
+
+    // WSL2 GPU passthrough via DirectX (/dev/dxg).
+    // WSL2 exposes the host GPU through a paravirtualized DirectX device
+    // rather than standard DRM render nodes or NVIDIA device files.
+    // The CUDA/D3D12 libraries live in /usr/lib/wsl/lib/ (mounted by WSL2 init).
+    let dxg = std::path::Path::new("/dev/dxg");
+    if dxg.exists() {
+        let cap = FsCapability::new_file(dxg, AccessMode::ReadWrite)?;
+        caps.add_fs(cap);
+        gpu_device_count = gpu_device_count.saturating_add(1);
+    }
+    let wsl_lib = std::path::Path::new("/usr/lib/wsl/lib");
+    if wsl_lib.is_dir() {
+        let cap = FsCapability::new_dir(wsl_lib, AccessMode::Read)?;
+        caps.add_fs(cap);
+    }
+
+    if gpu_device_count == 0 {
+        return Err(NonoError::SandboxInit(
+            "--allow-gpu: no GPU devices found (checked /dev/dri/renderD*, \
+             /dev/nvidia*, /dev/kfd, /dev/dxg)"
+                .to_string(),
+        ));
+    }
+
+    // Vulkan/Mesa ICD manifests (read-only, needed for Vulkan driver discovery)
+    // and GPU-specific sysfs (read-only). We use /sys/class/drm rather than
+    // /sys/devices to avoid exposing the full device tree (CPU, USB, PCI, ACPI).
+    for dir in &["/usr/share/vulkan", "/etc/vulkan", "/sys/class/drm"] {
+        let path = std::path::Path::new(dir);
+        if path.is_dir() {
+            let cap = FsCapability::new_dir(path, AccessMode::Read)?;
+            caps.add_fs(cap);
+        }
+    }
+
+    warn!(
+        "--allow-gpu enabled: allowing {} GPU device(s) on Linux",
+        gpu_device_count
+    );
+    Ok(true)
+}
+
+pub(crate) fn print_allow_gpu_warning(silent: bool) {
+    if silent {
+        return;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        eprintln!(
+            "  {}",
+            "WARNING: --allow-gpu permits the sandboxed process to access Metal GPU \
+             devices via IOKit (Apple Silicon only)."
+                .yellow()
+        );
+        eprintln!("  This grants IOKit connections for GPU compute (IOGPU, AGX, IOSurface).");
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        eprintln!(
+            "  {}",
+            "WARNING: --allow-gpu permits the sandboxed process to access GPU render nodes."
+                .yellow()
+        );
+        eprintln!(
+            "  This grants read/write access to /dev/dri/renderD* and NVIDIA compute devices."
+        );
+    }
 }
 
 pub(crate) fn prepare_sandbox(args: &SandboxArgs, silent: bool) -> Result<PreparedSandbox> {
@@ -505,7 +659,16 @@ pub(crate) fn prepare_sandbox(args: &SandboxArgs, silent: bool) -> Result<Prepar
         open_url_allow_localhost,
     )?;
 
+    // GPU access: macOS uses IOKit platform rules (tightened to AGXDeviceUserClient only),
+    // Linux uses filesystem capabilities for render nodes and compute devices.
+    #[cfg(target_os = "macos")]
     let allow_gpu_active = maybe_enable_macos_gpu(
+        &mut caps,
+        args.allow_gpu,
+        loaded_profile.is_none() || profile_allow_gpu,
+    )?;
+    #[cfg(target_os = "linux")]
+    let allow_gpu_active = maybe_enable_gpu(
         &mut caps,
         args.allow_gpu,
         loaded_profile.is_none() || profile_allow_gpu,

@@ -1691,6 +1691,25 @@ mod tests {
             .is_err());
     }
 
+    #[test]
+    fn test_platform_rule_validation_accepts_gpu_iokit_rules() {
+        let mut caps = CapabilitySet::new();
+        assert!(caps
+            .add_platform_rule(
+                "(allow iokit-open \
+                    (iokit-connection \"IOGPU\") \
+                    (iokit-user-client-class \
+                        \"AGXDeviceUserClient\" \
+                        \"AGXSharedUserClient\" \
+                        \"IOSurfaceRootUserClient\"))"
+            )
+            .is_ok());
+        assert!(caps
+            .add_platform_rule("(allow iokit-get-properties)")
+            .is_ok());
+        assert_eq!(caps.platform_rules().len(), 2);
+    }
+
     // NetworkMode tests
 
     #[test]

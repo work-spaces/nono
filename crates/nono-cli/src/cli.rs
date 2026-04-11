@@ -833,7 +833,7 @@ pub struct SandboxArgs {
     #[arg(long, help_heading = "OPTIONS")]
     pub allow_launch_services: bool,
 
-    /// Allow GPU access on Apple Silicon Macs through IOKit
+    /// Allow GPU access (Metal/IOKit on Apple Silicon macOS, render nodes on Linux)
     #[arg(long, help_heading = "OPTIONS")]
     pub allow_gpu: bool,
 
@@ -994,7 +994,7 @@ pub struct WrapSandboxArgs {
     #[arg(long, help_heading = "OPTIONS")]
     pub allow_launch_services: bool,
 
-    /// Allow GPU access on Apple Silicon Macs through IOKit
+    /// Allow GPU access (Metal/IOKit on Apple Silicon macOS, render nodes on Linux)
     #[arg(long, help_heading = "OPTIONS")]
     pub allow_gpu: bool,
 

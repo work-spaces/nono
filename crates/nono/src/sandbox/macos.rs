@@ -848,6 +848,67 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_profile_with_gpu_iokit_rules() {
+        let mut caps = CapabilitySet::new();
+        caps.add_platform_rule(
+            "(allow iokit-open \
+                (iokit-connection \"IOGPU\") \
+                (iokit-user-client-class \
+                    \"AGXDeviceUserClient\" \
+                    \"AGXSharedUserClient\" \
+                    \"IOSurfaceRootUserClient\"))",
+        )
+        .unwrap();
+        caps.add_platform_rule("(allow iokit-get-properties)")
+            .unwrap();
+
+        let profile = generate_profile(&caps).unwrap();
+
+        assert!(profile.contains("(allow iokit-open"));
+        assert!(profile.contains("IOGPU"));
+        assert!(profile.contains("AGXDeviceUserClient"));
+        assert!(profile.contains("AGXSharedUserClient"));
+        assert!(profile.contains("IOSurfaceRootUserClient"));
+        assert!(profile.contains("(allow iokit-get-properties)"));
+    }
+
+    #[test]
+    fn test_generate_profile_gpu_rules_ordering() {
+        // GPU rules (as platform rules) should appear between read and write rules
+        let mut caps = CapabilitySet::new();
+        caps.add_fs(FsCapability {
+            original: PathBuf::from("/test"),
+            resolved: PathBuf::from("/test"),
+            access: AccessMode::ReadWrite,
+            is_file: false,
+            source: CapabilitySource::User,
+        });
+        caps.add_platform_rule("(allow iokit-get-properties)")
+            .unwrap();
+
+        let profile = generate_profile(&caps).unwrap();
+
+        let read_pos = profile
+            .find("(allow file-read* (subpath \"/test\"))")
+            .expect("read rule not found");
+        let iokit_pos = profile
+            .find("(allow iokit-get-properties)")
+            .expect("iokit rule not found");
+        let write_pos = profile
+            .find("(allow file-write* (subpath \"/test\"))")
+            .expect("write rule not found");
+
+        assert!(
+            read_pos < iokit_pos,
+            "read rules must come before GPU/IOKit platform rules"
+        );
+        assert!(
+            iokit_pos < write_pos,
+            "GPU/IOKit platform rules must come before write rules"
+        );
+    }
+
+    #[test]
     fn test_escape_path_injection_via_newline() {
         // An attacker embeds a newline to break out of the quoted string and inject
         // a new S-expression. This must be rejected, not silently altered.

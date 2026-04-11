@@ -997,6 +997,9 @@ pub struct Profile {
     /// When `None`, inherits from the base profile.
     #[serde(default)]
     pub allow_launch_services: Option<bool>,
+    /// Opt-in gate for GPU access (Metal/IOKit on macOS, render nodes on Linux).
+    /// Must be paired with the CLI flag `--allow-gpu`.
+    /// When `None`, inherits from the base profile.
     #[serde(default)]
     pub allow_gpu: Option<bool>,
     /// Deprecated: Parsed for backward compatibility but ignored.
@@ -2686,7 +2689,7 @@ mod tests {
                 allow_localhost: false,
             }),
             allow_launch_services: Some(false),
-            allow_gpu: None,
+            allow_gpu: Some(false),
             interactive: false,
             skipdirs: vec!["vendor".to_string()],
         }
@@ -2755,7 +2758,7 @@ mod tests {
                 allow_localhost: true,
             }),
             allow_launch_services: Some(true),
-            allow_gpu: None,
+            allow_gpu: Some(true),
             interactive: false,
             skipdirs: vec!["dist".to_string()],
         }
@@ -3377,33 +3380,27 @@ mod tests {
     #[test]
     fn test_merge_profiles_allow_gpu() {
         // 1. Child inherits from base when child's value is None.
-        let mut base = base_profile();
-        base.allow_gpu = Some(true);
-        let child = child_profile(); // allow_gpu is None
-        let merged = merge_profiles(base, child);
+        let mut child = child_profile();
+        child.allow_gpu = None;
+        let merged = merge_profiles(base_profile(), child);
         assert_eq!(
             merged.allow_gpu,
-            Some(true),
+            Some(false),
             "Child should inherit allow_gpu from base"
         );
 
         // 2. Child overrides base when child has a value.
-        let mut base = base_profile();
-        base.allow_gpu = Some(true);
-        let mut child = child_profile();
-        child.allow_gpu = Some(false);
-        let merged = merge_profiles(base, child);
+        let merged = merge_profiles(base_profile(), child_profile());
         assert_eq!(
             merged.allow_gpu,
-            Some(false),
+            Some(true),
             "Child should override base allow_gpu"
         );
 
         // 3. Child's value is used when base has no value.
-        let base = base_profile(); // allow_gpu is None
-        let mut child = child_profile();
-        child.allow_gpu = Some(true);
-        let merged = merge_profiles(base, child);
+        let mut base = base_profile();
+        base.allow_gpu = None;
+        let merged = merge_profiles(base, child_profile());
         assert_eq!(
             merged.allow_gpu,
             Some(true),
