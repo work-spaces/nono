@@ -5,8 +5,8 @@ use crate::launch_runtime::{
     load_configured_detach_sequence, prepare_run_launch_plan, resolve_requested_workdir,
     select_exec_strategy, ExecutionFlags, LaunchPlan, SessionLaunchOptions,
 };
-use crate::proxy_runtime::prepare_proxy_launch_options;
 use crate::output;
+use crate::proxy_runtime::prepare_proxy_launch_options;
 use crate::sandbox_prepare::{
     prepare_sandbox, print_allow_gpu_warning, print_allow_launch_services_warning,
     validate_external_proxy_bypass,
