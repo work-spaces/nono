@@ -2684,7 +2684,9 @@ mod tests {
 
         let result = validate_custom_credential("test", &cred);
         let err = result.expect_err("proxy query_param_name should be required");
-        assert!(err.to_string().contains("proxy.query_param_name is required"));
+        assert!(err
+            .to_string()
+            .contains("proxy.query_param_name is required"));
     }
 
     #[test]
