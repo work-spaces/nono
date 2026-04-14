@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.35.0] - 2026-04-14
+
+### Bug Fixes
+
+- Chore: lint
+
+- Chore: revert to json! obj syntax
+
+- Chore: split predicate out again for provider specific claims
+
+- Refactor: expose build config URI extension
+
+- *(pty)* Improve session gone error detection when connecting
+
+- *(cli)* Increase detached session startup timeout and order
+
+
+### Features
+
+- *(trust)* Support GitLab ID tokens for signing
+
+- Strip proxy artifacts and fix upstream connection handling
+
+
+### Miscellaneous
+
+- Revert doc string
+
+- Drop example workflow in comment
+
+- Mention GitLab tokens in doc comment
+
+
+### Refactoring
+
+- Use append to merge signer fields
+
+- Use build signer URI extension for trust
+
 ## [0.34.0] - 2026-04-13
 
 ### Bug Fixes
