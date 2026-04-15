@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.36.0] - 2026-04-15
+
+### Bug Fixes
+
+- *(proxy)* Downgrade CONNECT-to-route-upstream log from warn to debug
+
+
+### Features
+
+- Add ?decode=go-keyring query param for keyring:// URIs
+
+- Add keyring:// URI scheme for custom-service credential lookup
+
 ## [0.35.0] - 2026-04-14
 
 ### Bug Fixes
