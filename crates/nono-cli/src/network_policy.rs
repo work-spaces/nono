@@ -222,10 +222,13 @@ pub fn resolve_credentials(
                     ))
                 })?;
             }
+
+            let oauth2 = cred.auth.clone();
+
             routes.push(RouteConfig {
                 prefix: name.clone(),
                 upstream: cred.upstream.clone(),
-                credential_key: Some(cred.credential_key.clone()),
+                credential_key: cred.credential_key.clone(),
                 inject_mode: cred.inject_mode.clone(),
                 inject_header: cred.inject_header.clone(),
                 credential_format: cred.credential_format.clone(),
@@ -256,6 +259,7 @@ pub fn resolve_credentials(
                         crate::policy::expand_path(p).map(|pb| pb.to_string_lossy().into_owned())
                     })
                     .transpose()?,
+                oauth2,
             });
         } else if let Some(cred) = policy.credentials.get(name) {
             // Validate env_var against dangerous variable blocklist
@@ -286,6 +290,7 @@ pub fn resolve_credentials(
                 tls_ca: None, // Built-in credentials don't support custom CAs
                 tls_client_cert: None,
                 tls_client_key: None,
+                oauth2: None,
             });
         }
         // We already validated existence above, so this else branch won't be hit
@@ -463,7 +468,8 @@ mod tests {
             "telegram".to_string(),
             CustomCredentialDef {
                 upstream: "https://api.telegram.org".to_string(),
-                credential_key: "telegram_bot_token".to_string(),
+                credential_key: Some("telegram_bot_token".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "Authorization".to_string(),
                 credential_format: "Bearer {}".to_string(),
@@ -502,7 +508,8 @@ mod tests {
             "openai".to_string(),
             CustomCredentialDef {
                 upstream: "https://my-proxy.example.com/openai".to_string(),
-                credential_key: "my_openai_key".to_string(),
+                credential_key: Some("my_openai_key".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "X-Custom-Auth".to_string(),
                 credential_format: "Token {}".to_string(),
@@ -537,7 +544,8 @@ mod tests {
             "telegram".to_string(),
             CustomCredentialDef {
                 upstream: "https://api.telegram.org".to_string(),
-                credential_key: "telegram_bot_token".to_string(),
+                credential_key: Some("telegram_bot_token".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "Authorization".to_string(),
                 credential_format: "Bearer {}".to_string(),
@@ -582,7 +590,8 @@ mod tests {
             "local".to_string(),
             CustomCredentialDef {
                 upstream: "http://localhost:8080/api".to_string(),
-                credential_key: "local_api_key".to_string(),
+                credential_key: Some("local_api_key".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "Authorization".to_string(),
                 credential_format: "Bearer {}".to_string(),
@@ -663,7 +672,8 @@ mod tests {
             "local".to_string(),
             CustomCredentialDef {
                 upstream: "http://127.1.2.3:8080/api".to_string(),
-                credential_key: "local_api_key".to_string(),
+                credential_key: Some("local_api_key".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "Authorization".to_string(),
                 credential_format: "Bearer {}".to_string(),
@@ -695,7 +705,8 @@ mod tests {
             "local".to_string(),
             CustomCredentialDef {
                 upstream: "http://0.0.0.0:3000/api".to_string(),
-                credential_key: "local_api_key".to_string(),
+                credential_key: Some("local_api_key".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "Authorization".to_string(),
                 credential_format: "Bearer {}".to_string(),
@@ -727,7 +738,8 @@ mod tests {
             "test".to_string(),
             CustomCredentialDef {
                 upstream: "https://api.example.com".to_string(),
-                credential_key: "api_key".to_string(),
+                credential_key: Some("api_key".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "X-Custom-Auth".to_string(),
                 credential_format: "Token {}".to_string(),
@@ -764,7 +776,8 @@ mod tests {
             "openai".to_string(),
             CustomCredentialDef {
                 upstream: "https://api.openai.com/v1".to_string(),
-                credential_key: "op://Development/OpenAI/credential".to_string(),
+                credential_key: Some("op://Development/OpenAI/credential".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "Authorization".to_string(),
                 credential_format: "Bearer {}".to_string(),
@@ -875,7 +888,8 @@ mod tests {
             "evil".to_string(),
             CustomCredentialDef {
                 upstream: "https://api.example.com".to_string(),
-                credential_key: "safe_key".to_string(),
+                credential_key: Some("safe_key".to_string()),
+                auth: None,
                 inject_mode: InjectMode::Header,
                 inject_header: "Authorization".to_string(),
                 credential_format: "Bearer {}".to_string(),
@@ -912,5 +926,97 @@ mod tests {
             "developer profile should include github credential, got: {:?}",
             resolved.profile_credentials
         );
+    }
+
+    #[test]
+    fn test_resolve_credentials_with_oauth2_auth() {
+        use crate::profile::CustomCredentialDef;
+        use nono_proxy::config::OAuth2Config;
+
+        let json = embedded_network_policy_json();
+        let policy = load_network_policy(json).unwrap();
+
+        let mut custom = HashMap::new();
+        custom.insert(
+            "my_api".to_string(),
+            CustomCredentialDef {
+                upstream: "https://api.example.com".to_string(),
+                credential_key: None,
+                auth: Some(OAuth2Config {
+                    token_url: "https://auth.example.com/oauth/token".to_string(),
+                    client_id: "my-client".to_string(),
+                    client_secret: "env://CLIENT_SECRET".to_string(),
+                    scope: "api.read".to_string(),
+                }),
+                inject_mode: InjectMode::Header,
+                inject_header: "Authorization".to_string(),
+                credential_format: "Bearer {}".to_string(),
+                path_pattern: None,
+                path_replacement: None,
+                query_param_name: None,
+                proxy: None,
+                env_var: None,
+                endpoint_rules: vec![],
+                tls_ca: None,
+                tls_client_cert: None,
+                tls_client_key: None,
+            },
+        );
+
+        let routes = resolve_credentials(&policy, &["my_api".to_string()], &custom).unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].prefix, "my_api");
+        assert_eq!(routes[0].upstream, "https://api.example.com");
+        assert!(
+            routes[0].credential_key.is_none(),
+            "OAuth2 route should not have credential_key"
+        );
+        assert!(
+            routes[0].oauth2.is_some(),
+            "OAuth2 route should have oauth2 config"
+        );
+        let oauth2 = routes[0].oauth2.as_ref().unwrap();
+        assert_eq!(oauth2.token_url, "https://auth.example.com/oauth/token");
+        assert_eq!(oauth2.client_id, "my-client");
+        assert_eq!(oauth2.client_secret, "env://CLIENT_SECRET");
+        assert_eq!(oauth2.scope, "api.read");
+    }
+
+    #[test]
+    fn test_resolve_credentials_without_oauth2_has_none() {
+        use crate::profile::CustomCredentialDef;
+
+        let json = embedded_network_policy_json();
+        let policy = load_network_policy(json).unwrap();
+
+        let mut custom = HashMap::new();
+        custom.insert(
+            "standard".to_string(),
+            CustomCredentialDef {
+                upstream: "https://api.example.com".to_string(),
+                credential_key: Some("my_key".to_string()),
+                auth: None,
+                inject_mode: InjectMode::Header,
+                inject_header: "Authorization".to_string(),
+                credential_format: "Bearer {}".to_string(),
+                path_pattern: None,
+                path_replacement: None,
+                query_param_name: None,
+                proxy: None,
+                env_var: None,
+                endpoint_rules: vec![],
+                tls_ca: None,
+                tls_client_cert: None,
+                tls_client_key: None,
+            },
+        );
+
+        let routes = resolve_credentials(&policy, &["standard".to_string()], &custom).unwrap();
+        assert_eq!(routes.len(), 1);
+        assert!(
+            routes[0].oauth2.is_none(),
+            "Non-OAuth2 route should not have oauth2 config"
+        );
+        assert_eq!(routes[0].credential_key, Some("my_key".to_string()));
     }
 }
