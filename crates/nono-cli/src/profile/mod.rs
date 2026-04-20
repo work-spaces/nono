@@ -3431,6 +3431,7 @@ mod tests {
             skipdirs: vec!["vendor".to_string()],
             packs: vec![],
             command_args: vec![],
+            unsafe_macos_seatbelt_rules: vec![],
         }
     }
 
@@ -3504,6 +3505,7 @@ mod tests {
             skipdirs: vec!["dist".to_string()],
             packs: vec![],
             command_args: vec![],
+            unsafe_macos_seatbelt_rules: vec![],
         }
     }
 
