@@ -49,6 +49,7 @@ mod sandbox_state;
 mod session;
 mod session_commands;
 mod setup;
+mod startup_prompt;
 mod startup_runtime;
 mod supervised_runtime;
 mod terminal_approval;
