@@ -530,10 +530,7 @@ async fn read_request_body(
 /// Stream the upstream TLS response back to the client.
 ///
 /// Returns the HTTP status code parsed from the first chunk.
-async fn stream_response<S>(
-    tls_stream: &mut S,
-    stream: &mut TcpStream,
-) -> Result<u16>
+async fn stream_response<S>(tls_stream: &mut S, stream: &mut TcpStream) -> Result<u16>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
@@ -1503,7 +1500,9 @@ mod tests {
         let loopback = [SocketAddr::from(([127, 0, 0, 1], 8080))];
         assert!(validate_http_upstream_target(UpstreamScheme::Http, "127.0.0.1", &[]).is_ok());
         assert!(validate_http_upstream_target(UpstreamScheme::Http, "::1", &[]).is_ok());
-        assert!(validate_http_upstream_target(UpstreamScheme::Http, "localhost", &loopback).is_ok());
+        assert!(
+            validate_http_upstream_target(UpstreamScheme::Http, "localhost", &loopback).is_ok()
+        );
     }
 
     #[test]
