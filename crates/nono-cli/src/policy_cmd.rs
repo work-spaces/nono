@@ -684,6 +684,23 @@ fn cmd_show(args: PolicyShowArgs) -> Result<()> {
         }
     }
 
+    // Raw Seatbelt rules — surfaced prominently so it is obvious a profile uses them.
+    // Shown on all platforms so cross-platform auditing is possible.
+    if !profile.unsafe_macos_seatbelt_rules.is_empty() {
+        println!();
+        println!(
+            "  {}",
+            theme::fg(
+                "Raw Seatbelt rules (unsafe_macos_seatbelt_rules):",
+                t.yellow
+            )
+            .bold()
+        );
+        for rule in &profile.unsafe_macos_seatbelt_rules {
+            println!("    {}", theme::fg(rule, t.text));
+        }
+    }
+
     Ok(())
 }
 
@@ -823,6 +840,10 @@ fn profile_to_json(
 
     if let Some(ag) = profile.allow_gpu {
         val["allow_gpu"] = serde_json::json!(ag);
+    }
+
+    if !profile.unsafe_macos_seatbelt_rules.is_empty() {
+        val["unsafe_macos_seatbelt_rules"] = serde_json::json!(profile.unsafe_macos_seatbelt_rules);
     }
 
     val
